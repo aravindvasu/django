@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+  web:
+    build: .
+      #command: gunicorn --bind 0.0.0.0:8000 myproject.wsgi:application
+    volumes:
+      - .:/app
+      - ./staticfiles:/app/staticfiles  # Mount static files
+    expose:
+      - 8000
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/nvn_db  # PostgreSQL connection string
+    ports:
+      - 8000:8000
+    depends_on:
+      - db  # Wait for the db service to be ready
+
+  db:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_DB: nvn_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persist PostgreSQL data
+
+volumes:
+  postgres_data:

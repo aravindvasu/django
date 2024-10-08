@@ -89,10 +89,10 @@ WSGI_APPLICATION = "myproject.wsgi.application"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'nvn_db',  # Should match POSTGRES_DB in docker-compose
+        'NAME': 'aravind',  # Should match POSTGRES_DB in docker-compose
         'USER': 'postgres',    # Should match POSTGRES_USER
-        'PASSWORD': 'postgres',  # Should match POSTGRES_PASSWORD
-        'HOST': 'db',  # The service name of your PostgreSQL container in docker-compose
+        'PASSWORD': 'Goodday1890*()',  # Should match POSTGRES_PASSWORD
+        'HOST': 'kongnew.cpsyw4u4wnla.us-east-1.rds.amazonaws.com',  # The service name of your PostgreSQL container in docker-compose
         'PORT': '5432',
     }
 }

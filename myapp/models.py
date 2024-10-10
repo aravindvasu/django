@@ -14,7 +14,7 @@ class Profile(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
-    updated_ankr = models.DateTimeField(auto_now=True)
+    #updated_ankr = models.DateTimeField(auto_now=True)
 
 
     def __str__(self):

@@ -9,7 +9,7 @@ pipeline {
                     
                     switch(env.BRANCH_NAME) {
                         case 'dev':
-                            jenkinsfilePath = 'jenkins/Jenkinsfile.dev'
+                            jenkinsfilePath = 'jenkins/Jenkinsfile.master'
                             break
                         case 'staging':
                             jenkinsfilePath = 'jenkins/Jenkinsfile.staging'

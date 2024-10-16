@@ -8,7 +8,7 @@ pipeline {
                     def jenkinsfilePath
                     
                     switch(env.BRANCH_NAME) {
-                        case 'dev':
+                        case 'master':
                             jenkinsfilePath = 'jenkins/Jenkinsfile.master'
                             break
                         case 'staging':

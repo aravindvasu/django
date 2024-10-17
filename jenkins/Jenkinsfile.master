@@ -1,149 +1,164 @@
 def call() {
-    // Define environment variables at script level
-    def ECR_REPOSITORY = '025066268261.dkr.ecr.us-east-2.amazonaws.com'
-    def AWS_REGION = 'us-east-2'
-    def IMAGE_NAME = 'dev-coreapp'
-    def AWS_DEFAULT_REGION = 'us-east-2'
-    def LAUNCH_TEMPLATE_ID = 'lt-02b33c58d2dc9bfc5'
-    def S3_BUCKET_NAME = 'stagecoreapp'
-    def S3_UPLOAD_PATH = 'dockerimages'
-    def dockerImage
     
-    // Print pipeline start
-    echo "Running DEV pipeline"
+    sh 'echo "Running STAGING pipeline"'
     
-    // Clone Repository stage
-    stage('Clone Repository') {
-        // Clean workspace
-        deleteDir()
-        
-        // Clone repository
-        checkout([
-            $class: 'GitSCM',
-            branches: [[name: 'dev']],
-            userRemoteConfigs: [[
-                url: 'https://github.com/AmbiHealthSystems/AnkrProductionMain.git',
-                credentialsId: '3e02b6b6-daf8-44f3-accf-a71a0f70abe3'
-            ]]
-        ])
-        
-        // File operations
-        def sourcePath = '/var/lib/jenkins'
-        def destinationPath = pwd()
-        
-        sh "scp ${sourcePath}/Dockerfile ${destinationPath}/Ambi_Health/"
-        sh "scp ${sourcePath}/environment.py ${destinationPath}/Ambi_Health/Ambi_Health/"
-        sh "mkdir -p ${destinationPath}/Ambi_Health/log"
-        sh "touch ${destinationPath}/Ambi_Health/log/app.log"
+    environment {
+        ECR_REPOSITORY = '025066268261.dkr.ecr.us-east-2.amazonaws.com'
+        AWS_REGION = 'us-east-2'
+        IMAGE_NAME = 'stage-coreapp'
+        AWS_DEFAULT_REGION = 'us-east-2'
+        LAUNCH_TEMPLATE_ID = 'lt-0080b2420bc41cb25'
     }
-    
-    // Build & Tag Docker Image stage
-    stage('Build & Tag Docker Image') {
-        dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_ID}", "Ambi_Health/.")
-        def ecrImageUri = "${ECR_REPOSITORY}/${IMAGE_NAME}:${env.BUILD_ID}"
-        sh "docker tag ${IMAGE_NAME}:${env.BUILD_ID} ${ecrImageUri}"
-    }
-    
-    // Upload to S3 stage
-    stage('Upload to S3') {
-        def TIMESTAMP = sh(script: "date +%Y%m%d-%H%M%S", returnStdout: true).trim()
-        sh """
-            docker save -o docker_image_${TIMESTAMP}.tar ${ECR_REPOSITORY}/${IMAGE_NAME}:${env.BUILD_ID}
-            aws s3 cp docker_image_${TIMESTAMP}.tar s3://${S3_BUCKET_NAME}/${S3_UPLOAD_PATH}/docker_image_${TIMESTAMP}.tar --region ${AWS_REGION}
-            rm -f docker_image_${TIMESTAMP}.tar
-        """
-    }
-    
-    // Push Docker Image to ECR stage
-    stage('Push Docker Image to ECR') {
-        def ecrLoginCommand = sh(script: "aws ecr get-login-password --region ${AWS_REGION}", returnStdout: true).trim()
-        sh "echo ${ecrLoginCommand} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}"
-        
-        def ecrImageUri = "${ECR_REPOSITORY}/${IMAGE_NAME}:${env.BUILD_ID}"
-        sh "docker push ${ecrImageUri}"
-    }
-    
-    // Update Launch Template stage
-    stage('Update Launch Template') {
-        // Get default version
-        def defaultVersion = sh(
-            script: """
-                aws ec2 describe-launch-templates \
-                    --launch-template-ids ${LAUNCH_TEMPLATE_ID} \
-                    --query 'LaunchTemplates[0].DefaultVersionNumber' \
-                    --output text
-            """,
-            returnStdout: true
-        ).trim()
-        
-        // Get template data
-        def templateData = sh(
-            script: """
-                aws ec2 describe-launch-template-versions \
-                    --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-                    --versions ${defaultVersion} \
-                    --query 'LaunchTemplateVersions[0].LaunchTemplateData'
-            """,
-            returnStdout: true
-        ).trim()
-        
-        // Create user data script
-        def userData = """#!/bin/bash
+	stage('Check Branch') {
+		   steps {
+			   script {
+				   def branch = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+				   if (branch != 'staging') {
+					   currentBuild.result = 'ABORTED'
+					   error("Stopping early, this is not the staging branch")
+				}
+			}
+		}
+	}
+	stage('Clone Repository') {
+		steps {
+			deleteDir()
+			
+			git branch: 'staging', credentialsId: '5f27365b-f012-47d2-adfb-514a9c319b2e', url: 'https://github.com/AmbiHealthSystems/AnkrProductionMain.git'
+			
+			script {
+				def sourcePath = '/var/lib/jenkins'
+				def destinationPath = "${env.WORKSPACE}"
+				
+				// sh "scp -i /var/lib/jenkins/Sandbox-Ankr.pem -r ubuntu@172.31.2.171:/home/ubuntu/AnkrProductionMain-staging/Ambi_Health/ ${destinationPath}/"
+				// sh "scp -r ${sourcePath}/migrations/Ankr_app/migrations/ ${destinationPath}/Ambi_Health/Ankr_app/"
+				// sh "scp -r ${sourcePath}/migrations/patient_app/migrations/ ${destinationPath}/Ambi_Health/patient_app/"
+				// sh "scp -r ${sourcePath}/migrations/ankr_healthcare/migrations/ ${destinationPath}/Ambi_Health/ankr_healthcare/"
+				// sh "scp -r ${sourcePath}/migrations/admin_app/migrations/ ${destinationPath}/Ambi_Health/admin_app/"
+				sh "scp ${sourcePath}/Dockerfile ${destinationPath}/Ambi_Health/"
+				sh "scp ${sourcePath}/environment.py ${destinationPath}/Ambi_Health/Ambi_Health/"
+				sh "mkdir ${destinationPath}/Ambi_Health/log"
+				sh "touch ${destinationPath}/Ambi_Health/log/app.log"
+				sh "scp -r ${sourcePath}/media ${destinationPath}/Ambi_Health/"
+				// sh "scp ${sourcePath}/urls.py ${destinationPath}/Ambi_Health/Ambi_Health/"
+				// sh "scp ${sourcePath}/settings.py ${destinationPath}/Ambi_Health/Ambi_Health/"
+				// sh "scp ${sourcePath}/manage.py ${destinationPath}/Ambi_Health/"
+			}
+		}
+	}
+	
+	stage('Build & Tag Docker Image') {
+		steps {
+			script {
+				dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_ID}", "Ambi_Health/.")
+			}
+			script {
+				def ecrImageUri = "${ECR_REPOSITORY}/${IMAGE_NAME}:${env.BUILD_ID}"
+				sh "docker tag ${IMAGE_NAME}:${env.BUILD_ID} ${ecrImageUri}"
+			}
+		}
+	}
+	
+	stage('Push Docker Image to ECR') {
+		steps {
+			script {
+				def ecrLoginCommand = sh(script: 'aws ecr get-login-password --region ${AWS_REGION}', returnStdout: true).trim()
+				sh "echo ${ecrLoginCommand} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}"
+			}
+			script {
+				def ecrImageUri = "${ECR_REPOSITORY}/${IMAGE_NAME}:${env.BUILD_ID}"
+				sh "docker push ${ecrImageUri}"
+			}
+		}
+	}
+		
+	stage('Update Launch Template') {
+		steps {
+			script {
+				// Get the default version of the launch template
+				def defaultVersion = sh(
+					script: """
+					aws ec2 describe-launch-templates \
+						--launch-template-ids ${LAUNCH_TEMPLATE_ID} \
+						--query 'LaunchTemplates[0].DefaultVersionNumber' \
+						--output text
+					""",
+					returnStdout: true
+				).trim()
+
+				// Get the launch template data
+				def templateData = sh(
+					script: """
+					aws ec2 describe-launch-template-versions \
+						--launch-template-id ${LAUNCH_TEMPLATE_ID} \
+						--versions ${defaultVersion} \
+						--query 'LaunchTemplateVersions[0].LaunchTemplateData'
+					""",
+					returnStdout: true
+				).trim()
+
+				// Create a temporary file with the user-data script
+				writeFile file: 'user_data.sh', text: """#!/bin/bash
 aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 025066268261.dkr.ecr.us-east-2.amazonaws.com
-docker pull 025066268261.dkr.ecr.us-east-2.amazonaws.com/dev-coreapp:${env.BUILD_ID}
-docker run -d --name ambi_health -p 8000:8000 025066268261.dkr.ecr.us-east-2.amazonaws.com/dev-coreapp:${env.BUILD_ID} bash -c "service cron start && python manage.py crontab add && gunicorn Ambi_Health.wsgi:application --bind 0.0.0.0:8000 --reload"
+docker pull 025066268261.dkr.ecr.us-east-2.amazonaws.com/stage-coreapp:${BUILD_ID}
+docker run -d --name ambi_health -p 8000:8000 025066268261.dkr.ecr.us-east-2.amazonaws.com/stage-coreapp:${BUILD_ID} bash -c "service cron start && python manage.py crontab add && gunicorn Ambi_Health.wsgi:application --bind 0.0.0.0:8000 --reload"
 sleep 100
 docker exec ambi_health python manage.py makemigrations admin_app Ankr_app ankr_healthcare patient_app
 docker exec ambi_health python manage.py migrate
 """
-        
-        writeFile file: 'user_data.sh', text: userData
-        
-        // Encode user data
-        def encodedUserData = sh(
-            script: "base64 -w 0 user_data.sh",
-            returnStdout: true
-        ).trim()
-        
-        // Create new template version
-        def createVersionResult = sh(
-            script: """
-                aws ec2 create-launch-template-version \
-                    --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-                    --source-version ${defaultVersion} \
-                    --launch-template-data '${templateData}' \
-                    --launch-template-data '{"UserData":"${encodedUserData}"}' \
-                    --query 'LaunchTemplateVersion.VersionNumber' \
-                    --output text
-            """,
-            returnStdout: true
-        ).trim()
-        
-        echo "New launch template version ${createVersionResult} created successfully"
-        
-        // Set as default version
-        sh """
-            aws ec2 modify-launch-template \
-                --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-                --default-version ${createVersionResult}
-        """
-        
-        echo "Version ${createVersionResult} set as the new default"
-        sh "rm user_data.sh"
-    }
-    
-    // ASG Instance Refresh stage
-    stage('ASG Instance Refresh') {
-        def asgName = 'DEV-CoreApp-ASG'
-        def region = 'us-east-2'
-        
-        sh """
-            aws autoscaling start-instance-refresh \
-                --auto-scaling-group-name ${asgName} \
-                --preferences '{"InstanceWarmup": 300, "MinHealthyPercentage": 90}' \
-                --region ${region}
-        """
-    }
+
+				// Encode the user-data using base64 in a shell command
+				def encodedUserData = sh(
+					script: "base64 -w 0 user_data.sh",
+					returnStdout: true
+				).trim()
+
+				// Create a new launch template version
+				def createVersionResult = sh(
+					script: """
+					aws ec2 create-launch-template-version \
+						--launch-template-id ${LAUNCH_TEMPLATE_ID} \
+						--source-version ${defaultVersion} \
+						--launch-template-data '${templateData}' \
+						--launch-template-data '{"UserData":"${encodedUserData}"}' \
+						--query 'LaunchTemplateVersion.VersionNumber' \
+						--output text
+					""",
+					returnStdout: true
+				).trim()
+
+				echo "New launch template version ${createVersionResult} created successfully"
+
+				// Set the new version as the default
+				sh """
+				aws ec2 modify-launch-template \
+					--launch-template-id ${LAUNCH_TEMPLATE_ID} \
+					--default-version ${createVersionResult}
+				"""
+
+				echo "Version ${createVersionResult} set as the new default"
+
+				// Clean up the temporary file
+				sh "rm user_data.sh"
+			}
+		}
+	}
+	stage('ASG Instance Refresh') {
+		steps {
+			script {   
+				def asgName = 'STAGE-CoreApp-ASG'
+				def region = 'us-east-2'
+	
+				// Execute AWS CLI command to trigger the instance refresh
+				sh """
+				aws autoscaling start-instance-refresh \
+				--auto-scaling-group-name ${asgName} \
+				--preferences '{"InstanceWarmup": 300, "MinHealthyPercentage": 90}' \
+				--region ${region}
+				"""
+			}
+		}
+	}
 }
 
 return this

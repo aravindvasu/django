@@ -2,27 +2,24 @@ pipeline {
     agent any
     
     stages {
-        stage('Determine Environment') {
+        stage('Load Environment Pipeline') {
             steps {
                 script {
-                    def jenkinsfilePath
+                    def envPipeline
                     
                     switch(env.BRANCH_NAME) {
-                        case 'master':
-                            jenkinsfilePath = 'jenkins/Jenkinsfile.master'
+                        case 'dev':
+                            envPipeline = load 'jenkins/Jenkinsfile.dev'
                             break
                         case 'staging':
-                            jenkinsfilePath = 'jenkins/Jenkinsfile.staging'
+                            envPipeline = load 'jenkins/Jenkinsfile.staging'
                             break
                         default:
                             error "Unsupported branch: ${env.BRANCH_NAME}"
                     }
                     
-                    if (fileExists(jenkinsfilePath)) {
-                        load jenkinsfilePath
-                    } else {
-                        error "Jenkinsfile not found: ${jenkinsfilePath}"
-                    }
+                    // Execute the environment-specific pipeline
+                    envPipeline.call()
                 }
             }
         }

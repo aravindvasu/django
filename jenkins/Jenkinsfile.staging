@@ -1,1 +1,21 @@
-echo "stage"
+def call() {
+    // Staging-specific pipeline steps
+    sh 'echo "Running staging pipeline"'
+    
+    // Build stage
+    stage('Build - Staging') {
+        sh 'mvn clean install'
+    }
+    
+    // Test stage
+    stage('Test - Staging') {
+        sh 'mvn test'
+    }
+    
+    // Deploy stage
+    stage('Deploy - Staging') {
+        sh 'echo "Deploying to staging environment"'
+    }
+}
+
+return this

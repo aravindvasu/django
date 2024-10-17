@@ -8,8 +8,8 @@ pipeline {
                     def envPipeline
                     
                     switch(env.BRANCH_NAME) {
-                        case 'dev':
-                            envPipeline = load 'jenkins/Jenkinsfile.dev'
+                        case 'master':
+                            envPipeline = load 'jenkins/Jenkinsfile.master'
                             break
                         case 'staging':
                             envPipeline = load 'jenkins/Jenkinsfile.staging'
